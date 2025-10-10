@@ -1,0 +1,7 @@
+config ZMK_BEHAVIOR_AUTO_HOLD_TIMEOUT_MS
+    int "Default auto-hold timeout in milliseconds"
+    default 2000
+
+config ZMK_BEHAVIOR_AUTO_HOLD_MAX_BEHAVIORS
+    int "Maximum auto hold instances"
+    default 8

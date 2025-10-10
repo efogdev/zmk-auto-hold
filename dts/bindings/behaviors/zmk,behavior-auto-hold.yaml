@@ -1,0 +1,11 @@
+description: Auto-hold behavior
+compatible: "zmk,behavior-auto-hold"
+include: one_param.yaml
+
+properties:
+  bindings:
+    type: phandles
+    required: true
+  timeout-ms:
+    type: int
+    required: false
