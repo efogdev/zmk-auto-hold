@@ -96,9 +96,7 @@ static int auto_hold_keycode_listener(const zmk_event_t *eh) {
     if (ev == NULL || !ev->state) {
         return ZMK_EV_EVENT_BUBBLE;
     }
-
-    LOG_INF("Devices: %d", behavior_auto_hold_count);
-
+    
     for (int i = 0; i < behavior_auto_hold_count; i++) {
         const struct device *dev = devices[i];
         if (dev == NULL) {
@@ -108,9 +106,8 @@ static int auto_hold_keycode_listener(const zmk_event_t *eh) {
         struct behavior_auto_hold_data *data = dev->data;
         const struct behavior_auto_hold_config *cfg = dev->config;
 
-        LOG_INF("Auto held: %d", data->is_auto_held);
         if (data->is_auto_held) {
-            LOG_INF("Releasing auto-held key at position %d", data->position);
+            LOG_DBG("Releasing auto-held key at position %d", data->position);
             const struct zmk_behavior_binding_event release_event = {
                 .position = data->position,
                 .timestamp = k_uptime_get(),
