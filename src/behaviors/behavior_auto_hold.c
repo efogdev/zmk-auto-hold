@@ -21,6 +21,10 @@ struct behavior_auto_hold_data {
     struct k_work_delayable timeout_work;
     struct zmk_behavior_binding binding;
     uint8_t held_layer;
+
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+    struct behavior_parameter_metadata_set set;
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 };
 
 static const struct device* devices[CONFIG_ZMK_BEHAVIOR_AUTO_HOLD_MAX_BEHAVIORS];
@@ -104,8 +108,6 @@ static int auto_hold_keycode_listener(const zmk_event_t *eh) {
         }
 
         struct behavior_auto_hold_data *data = dev->data;
-        const struct behavior_auto_hold_config *cfg = dev->config;
-
         if (data->is_auto_held) {
             LOG_DBG("Releasing auto-held key at position %d", data->position);
             const struct zmk_behavior_binding_event release_event = {
@@ -136,9 +138,38 @@ static int behavior_auto_hold_init(const struct device *dev) {
     return 0;
 }
 
+
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+static int auto_hold_parameter_metadata(const struct device *dev,
+                                       struct behavior_parameter_metadata *param_metadata) {
+    const struct behavior_auto_hold_config *cfg = dev->config;
+    struct behavior_auto_hold_data *data = dev->data;
+    struct behavior_parameter_metadata child_meta;
+
+    const int err = behavior_get_parameter_metadata(zmk_behavior_get_binding(cfg->binding.behavior_dev), &child_meta);
+    if (err < 0) {
+        LOG_WRN("Failed to get the hold behavior parameter: %d", err);
+        return err;
+    }
+
+    if (child_meta.sets_len > 0) {
+        data->set.param1_values = child_meta.sets[0].param1_values;
+        data->set.param1_values_len = child_meta.sets[0].param1_values_len;
+    }
+
+    param_metadata->sets = &data->set;
+    param_metadata->sets_len = 1;
+    return 0;
+}
+
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+
 static const struct behavior_driver_api behavior_auto_hold_driver_api = {
     .binding_pressed = on_auto_hold_binding_pressed,
     .binding_released = on_auto_hold_binding_released,
+#if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
+    .get_parameter_metadata = &auto_hold_parameter_metadata,
+#endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 };
 
 #define AH_INST(n)                                                                          \
