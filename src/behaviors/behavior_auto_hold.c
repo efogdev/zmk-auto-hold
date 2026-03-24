@@ -3,6 +3,7 @@
 #include <zephyr/device.h>
 #include <drivers/behavior.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
 #include <zmk/behavior.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
@@ -16,7 +17,7 @@ struct behavior_auto_hold_config {
 
 struct behavior_auto_hold_data {
     int32_t position;
-    bool is_auto_held;
+    atomic_t is_auto_held;
     int64_t press_timestamp;
     struct k_work_delayable timeout_work;
     struct zmk_behavior_binding binding;
@@ -35,7 +36,7 @@ static void auto_hold_timeout_handler(struct k_work *work) {
     struct behavior_auto_hold_data *data =
         CONTAINER_OF(dwork, struct behavior_auto_hold_data, timeout_work);
 
-    data->is_auto_held = true;
+    atomic_set(&data->is_auto_held, 1);
     LOG_DBG("Auto-hold activated at position %d", data->position);
 }
 
@@ -44,8 +45,8 @@ static int on_auto_hold_binding_pressed(struct zmk_behavior_binding *binding, st
     const struct behavior_auto_hold_config *cfg = dev->config;
     struct behavior_auto_hold_data *data = dev->data;
 
-    if (data->is_auto_held) {
-        data->is_auto_held = false;
+    if (atomic_get(&data->is_auto_held)) {
+        atomic_set(&data->is_auto_held, 0);
         k_work_cancel_delayable(&data->timeout_work);
 
         const struct zmk_behavior_binding new_binding = {
@@ -57,7 +58,7 @@ static int on_auto_hold_binding_pressed(struct zmk_behavior_binding *binding, st
     }
 
     data->position = event.position;
-    data->is_auto_held = false;
+    atomic_set(&data->is_auto_held, 0);
     data->press_timestamp = event.timestamp;
 
     LOG_DBG("Waiting for timeout to start auto hold");
@@ -81,7 +82,7 @@ static int on_auto_hold_binding_released(struct zmk_behavior_binding *binding, s
     struct behavior_auto_hold_data *data = dev->data;
 
     k_work_cancel_delayable(&data->timeout_work);
-    if (data->is_auto_held) {
+    if (atomic_get(&data->is_auto_held)) {
         LOG_DBG("Auto-hold active, not releasing");
         return ZMK_BEHAVIOR_OPAQUE;
     }
@@ -108,7 +109,7 @@ static int auto_hold_keycode_listener(const zmk_event_t *eh) {
         }
 
         struct behavior_auto_hold_data *data = dev->data;
-        if (data->is_auto_held) {
+        if (atomic_get(&data->is_auto_held)) {
             LOG_DBG("Releasing auto-held key at position %d", data->position);
             const struct zmk_behavior_binding_event release_event = {
                 .position = data->position,
@@ -118,7 +119,7 @@ static int auto_hold_keycode_listener(const zmk_event_t *eh) {
 
             k_work_cancel_delayable(&data->timeout_work);
             zmk_behavior_invoke_binding(&data->binding, release_event, false);
-            data->is_auto_held = false;
+            atomic_set(&data->is_auto_held, 0);
         }
     }
 
