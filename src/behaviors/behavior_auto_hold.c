@@ -8,6 +8,11 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
 
+#if IS_ENABLED(CONFIG_ZMK_ADAPTIVE_FEEDBACK)
+#include <zmk_adaptive_feedback/adaptive_feedback.h>
+ZAF_CUSTOM_EVENT_DEFINE(ah_key_auto_held, "key-auto-held");
+#endif
+
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 struct behavior_auto_hold_config {
@@ -38,6 +43,9 @@ static void auto_hold_timeout_handler(struct k_work *work) {
 
     atomic_set(&data->is_auto_held, 1);
     LOG_DBG("Auto-hold activated at position %d", data->position);
+#if IS_ENABLED(CONFIG_ZMK_ADAPTIVE_FEEDBACK)
+    zaf_custom_event_trigger(&ah_key_auto_held);
+#endif
 }
 
 static int on_auto_hold_binding_pressed(struct zmk_behavior_binding *binding, struct zmk_behavior_binding_event event) {
