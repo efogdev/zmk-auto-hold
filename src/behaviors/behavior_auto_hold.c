@@ -8,6 +8,12 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
 
+#if IS_ENABLED(CONFIG_ZMK_RUNTIME_CONFIG)
+#include <zmk_runtime_config/runtime_config.h>
+#else
+#define ZRC_GET(key, default_val) (default_val)
+#endif
+
 #if IS_ENABLED(CONFIG_ZMK_ADAPTIVE_FEEDBACK)
 #include <zmk_adaptive_feedback/adaptive_feedback.h>
 ZAF_CUSTOM_EVENT_DEFINE(ah_key_auto_held, "key-auto-held");
@@ -71,7 +77,10 @@ static int on_auto_hold_binding_pressed(struct zmk_behavior_binding *binding, st
 
     LOG_DBG("Waiting for timeout to start auto hold");
 
-    k_work_schedule(&data->timeout_work, K_MSEC(cfg->timeout_ms));
+    const int timeout_ms = cfg->timeout_ms > 0
+        ? cfg->timeout_ms
+        : ZRC_GET("ah/timeout_ms", CONFIG_ZMK_BEHAVIOR_AUTO_HOLD_TIMEOUT_MS);
+    k_work_schedule(&data->timeout_work, K_MSEC(timeout_ms));
 
     const struct zmk_behavior_binding new_binding = {
         .behavior_dev = cfg->binding.behavior_dev,
@@ -173,6 +182,14 @@ static int auto_hold_parameter_metadata(const struct device *dev,
 
 #endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
 
+#if IS_ENABLED(CONFIG_ZMK_RUNTIME_CONFIG)
+static int ah_register_runtime_params(void) {
+    zrc_register("ah/timeout_ms", CONFIG_ZMK_BEHAVIOR_AUTO_HOLD_TIMEOUT_MS, 50, 60000);
+    return 0;
+}
+SYS_INIT(ah_register_runtime_params, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE);
+#endif
+
 static const struct behavior_driver_api behavior_auto_hold_driver_api = {
     .binding_pressed = on_auto_hold_binding_pressed,
     .binding_released = on_auto_hold_binding_released,
@@ -189,8 +206,7 @@ static const struct behavior_driver_api behavior_auto_hold_driver_api = {
             .param1 = COND_CODE_0(DT_INST_PHA_HAS_CELL_AT_IDX(n, bindings, 0, param1),      \
                                   (0), (DT_INST_PHA_BY_IDX(n, bindings, 0, param1))),       \
         },                                                                                  \
-        .timeout_ms = DT_INST_PROP_OR(n, timeout_ms,                                        \
-                                      CONFIG_ZMK_BEHAVIOR_AUTO_HOLD_TIMEOUT_MS),            \
+        .timeout_ms = DT_INST_PROP_OR(n, timeout_ms, 0),                                    \
     };                                                                                      \
     BEHAVIOR_DT_INST_DEFINE(n, behavior_auto_hold_init, NULL, &behavior_auto_hold_data_##n, \
                            &behavior_auto_hold_config_##n, POST_KERNEL,                     \

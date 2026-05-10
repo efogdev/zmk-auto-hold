@@ -5,7 +5,6 @@
 			display-name = "Auto hold keyboard key";
 			#binding-cells = <1>;
 			bindings = <&kp>;
-			timeout-ms = <5000>;
 		};
 
 		mah: mouse_auto_hold {
@@ -13,7 +12,6 @@
 			display-name = "Auto hold mouse key";
 			#binding-cells = <1>;
 			bindings = <&mkp>;
-			timeout-ms = <1250>;
 		};
 	};
 };
