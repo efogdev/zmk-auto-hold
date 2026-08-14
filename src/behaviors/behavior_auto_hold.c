@@ -118,7 +118,8 @@ static int auto_hold_keycode_listener(const zmk_event_t *eh) {
     if (ev == NULL || !ev->state) {
         return ZMK_EV_EVENT_BUBBLE;
     }
-    
+
+    bool interrupted = false;
     for (int i = 0; i < behavior_auto_hold_count; i++) {
         const struct device *dev = devices[i];
         if (dev == NULL) {
@@ -134,10 +135,15 @@ static int auto_hold_keycode_listener(const zmk_event_t *eh) {
                 .layer = data->held_layer,
             };
 
+            interrupted = true;
             k_work_cancel_delayable(&data->timeout_work);
             zmk_behavior_invoke_binding(&data->binding, release_event, false);
             atomic_set(&data->is_auto_held, 0);
         }
+    }
+
+    if (interrupted && ZRC_GET("ah/anykey_interrupt", IS_ENABLED(CONFIG_ZMK_BEHAVIOR_AUTO_HOLD_ANYKEY_INTERRUPT))) {
+        return ZMK_EV_EVENT_HANDLED;
     }
 
     return ZMK_EV_EVENT_BUBBLE;
@@ -152,7 +158,6 @@ static int behavior_auto_hold_init(const struct device *dev) {
 
     devices[behavior_auto_hold_count] = dev;
     behavior_auto_hold_count++;
-
     return 0;
 }
 
@@ -185,6 +190,7 @@ static int auto_hold_parameter_metadata(const struct device *dev,
 #if IS_ENABLED(CONFIG_ZMK_RUNTIME_CONFIG)
 static int ah_register_runtime_params(void) {
     zrc_register("ah/timeout_ms", CONFIG_ZMK_BEHAVIOR_AUTO_HOLD_TIMEOUT_MS, 50, 60000);
+    zrc_register("ah/anykey_interrupt", IS_ENABLED(CONFIG_ZMK_BEHAVIOR_AUTO_HOLD_ANYKEY_INTERRUPT), 0, 1);
     return 0;
 }
 SYS_INIT(ah_register_runtime_params, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE);
